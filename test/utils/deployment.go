@@ -114,6 +114,52 @@ func waitForDeploymentCompleteMaybeCheckRolling(c clientset.Interface, d *extens
 	return nil
 }
 
+// waitForDeploymentCompleteMaybeCheckRollingV1 Waits for the deployment to complete.
+// If during a rolling update (rolling == true), returns an error if the deployment's
+// rolling update strategy (max unavailable or max surge) is broken at any times.
+// It's not seen as a rolling update if shortly after a scaling event or the deployment is just created.
+// func waitForDeploymentCompleteMaybeCheckRollingV1(c clientset.Interface, d *apps.Deployment, rolling bool, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
+// 	var (
+// 		deployment *apps.Deployment
+// 		reason     string
+// 	)
+
+// 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+// 		var err error
+// 		deployment, err = c.AppsV1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+// 		if err != nil {
+// 			return false, err
+// 		}
+
+// 		// If during a rolling update, make sure rolling update strategy isn't broken at any times.
+// 		if rolling {
+// 			reason, err = checkRollingUpdateStatusV1(c, deployment, logf)
+// 			if err != nil {
+// 				return false, err
+// 			}
+// 			logf(reason)
+// 		}
+
+// 		// When the deployment status and its underlying resources reach the desired state, we're done
+// 		if deploymentutil.DeploymentComplete(d, &deployment.Status) {
+// 			return true, nil
+// 		}
+
+// 		reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
+// 		logf(reason)
+
+// 		return false, nil
+// 	})
+
+// 	if err == wait.ErrWaitTimeout {
+// 		err = fmt.Errorf("%s", reason)
+// 	}
+// 	if err != nil {
+// 		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.Name, err)
+// 	}
+// 	return nil
+// }
+
 func checkRollingUpdateStatus(c clientset.Interface, deployment *extensions.Deployment, logf LogfFn) (string, error) {
 	var reason string
 	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
@@ -151,6 +197,43 @@ func checkRollingUpdateStatus(c clientset.Interface, deployment *extensions.Depl
 	return "", nil
 }
 
+// func checkRollingUpdateStatusV1(c clientset.Interface, deployment *apps.Deployment, logf LogfFn) (string, error) {
+// 	var reason string
+// 	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSetsV1(deployment, c.AppsV1())
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	if newRS == nil {
+// 		// New RC hasn't been created yet.
+// 		reason = "new replica set hasn't been created yet"
+// 		return reason, nil
+// 	}
+// 	allRSs := append(oldRSs, newRS)
+// 	// The old/new ReplicaSets need to contain the pod-template-hash label
+// 	for i := range allRSs {
+// 		if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+// 			reason = "all replica sets need to contain the pod-template-hash label"
+// 			return reason, nil
+// 		}
+// 	}
+
+// 	// Check max surge and min available
+// 	totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
+// 	maxCreated := *(deployment.Spec.Replicas) + deploymentutil.MaxSurge(*deployment)
+// 	if totalCreated > maxCreated {
+// 		LogReplicaSetsOfDeployment(deployment, allOldRSs, newRS, logf)
+// 		LogPodsOfDeployment(c, deployment, allRSs, logf)
+// 		return "", fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
+// 	}
+// 	minAvailable := deploymentutil.MinAvailable(deployment)
+// 	if deployment.Status.AvailableReplicas < minAvailable {
+// 		LogReplicaSetsOfDeployment(deployment, allOldRSs, newRS, logf)
+// 		LogPodsOfDeployment(c, deployment, allRSs, logf)
+// 		return "", fmt.Errorf("total pods available: %d, less than the min required: %d", deployment.Status.AvailableReplicas, minAvailable)
+// 	}
+// 	return "", nil
+// }
+
 // Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
 // Rolling update strategy should not be broken during a rolling update.
 func WaitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *extensions.Deployment, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
@@ -165,6 +248,14 @@ func WaitForDeploymentComplete(c clientset.Interface, d *extensions.Deployment, 
 	rolling := false
 	return waitForDeploymentCompleteMaybeCheckRolling(c, d, rolling, logf, pollInterval, pollTimeout)
 }
+
+// WaitForDeploymentCompleteV1 Waits for the deployment to complete, and don't check if rolling update strategy is broken.
+// Rolling update strategy is used only during a rolling update, and can be violated in other situations,
+// such as shortly after a scaling event or the deployment is just created.
+// func WaitForDeploymentCompleteV1(c clientset.Interface, d *apps.Deployment, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
+// 	rolling := false
+// 	return waitForDeploymentCompleteMaybeCheckRollingV1(c, d, rolling, logf, pollInterval, pollTimeout)
+// }
 
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
 // Note that deployment revision and its new RS revision should be updated shortly, so we only wait for 1 minute here to fail early.

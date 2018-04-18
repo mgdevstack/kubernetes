@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,12 +114,50 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 	}
 }
 
-// Waits for the deployment to complete, and don't check if rolling update strategy is broken.
+// NewDeploymentV1 returns declarative Deployment Object
+func NewDeploymentV1(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType apps.DeploymentStrategyType) *apps.Deployment {
+	zero := int64(0)
+	return &apps.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deploymentName,
+		},
+		Spec: apps.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
+			Strategy: apps.DeploymentStrategy{
+				Type: strategyType,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabels,
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers: []v1.Container{
+						{
+							Name:  imageName,
+							Image: image,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// WaitForDeploymentComplete Waits for the deployment to complete, and don't check if rolling update strategy is broken.
 // Rolling update strategy is used only during a rolling update, and can be violated in other situations,
 // such as shortly after a scaling event or the deployment is just created.
 func WaitForDeploymentComplete(c clientset.Interface, d *extensions.Deployment) error {
 	return testutils.WaitForDeploymentComplete(c, d, Logf, Poll, pollLongTimeout)
 }
+
+// WaitForDeploymentCompleteV1 Waits for the deployment to complete, and don't check if rolling update strategy is broken.
+// Rolling update strategy is used only during a rolling update, and can be violated in other situations,
+// such as shortly after a scaling event or the deployment is just created.
+// func WaitForDeploymentCompleteV1(c clientset.Interface, d *extensions.Deployment) error {
+// 	return testutils.WaitForDeploymentCompleteV1(c, d, Logf, Poll, pollLongTimeout)
+// }
 
 // Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
 // Rolling update strategy should not be broken during a rolling update.

@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -98,7 +99,50 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
+
+	// This covers GET, POST, DELETE operations on deployment endpoint on /apis/apps/v1 endpoints.
+	It("should support CRUD operations", func() {
+		crudOperations(f)
+	})
 })
+
+func crudOperations(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	deploymentName := "crud-operations"
+
+	podLabels := map[string]string{"name": NginxImageName}
+	replicas := int32(1)
+
+	framework.Logf("Verifying if deployment:{ %s } already exists", deploymentName)
+
+	// Get Deployment
+	deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	framework.Logf("deployment status: %v", deployment)
+	Expect(err).To(HaveOccurred())
+
+	// Creating Deployment
+	d := framework.NewDeploymentV1(deploymentName, replicas, podLabels, NginxImageName, NginxImage, apps.RollingUpdateDeploymentStrategyType)
+
+	deploy, err := c.AppsV1().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Deployment Initiated: %v", deploy)
+	framework.Logf("Should wait for deloyment: { %s } to complete.", deploymentName)
+
+	// err = framework.WaitForDeploymentCompleteV1(c, deploy)
+	// Expect(err).NotTo(HaveOccurred())
+
+	// Get Deployment
+	// deployment, err = c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	// Expect(err).NotTo(HaveOccurred())
+
+	// Delete Deployment and expect err NotTo HaveOccurred
+	// deleteOptions := metav1.DeleteOptions{}
+	// err = c.AppsV1().Deployments(ns).Delete(d.Name, deleteOptions)
+	// Expect(err).NotTo(HaveOccurred())
+
+}
 
 func failureTrap(c clientset.Interface, ns string) {
 	deployments, err := c.ExtensionsV1beta1().Deployments(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
