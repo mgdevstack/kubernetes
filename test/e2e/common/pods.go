@@ -658,7 +658,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
-	// Slow by design (~27 mins) issue-#19027
+	// Slow by design (~27 mins) issue #19027
 	It("should cap back-off at MaxContainerBackOff [Slow][NodeConformance]", func() {
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
