@@ -211,7 +211,12 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should provide DNS for pods for Hostname and Subdomain", func() {
+	/*
+		Release: v1.14
+		Testname: DNS, for Hostname and Subdomain
+		Description: Create a pod with hostname. Create a headless service with same name as of subdomain name. Pod's FQDN is set as hostname.subdomain.namespace.domainName. Pod MUST be able to resolve its Fully qualified DNS entry by serving an A record at that name.
+	*/
+	framework.ConformanceIt("should provide DNS for pods for Hostname and Subdomain", func() {
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{
